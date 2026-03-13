@@ -1,23 +1,77 @@
 import { requireSuperadmin } from '../../lib/supabase/server';
 
-export default async function ProfilesPage() {
-  const { supabase } = await requireSuperadmin();
+const PAGE_SIZE = 50;
 
-  const { data: profiles } = await supabase
+export default async function ProfilesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; email?: string }>;
+}) {
+  const { supabase } = await requireSuperadmin();
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? '1', 10));
+  const emailQuery = (params.email ?? '').trim();
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabase
     .from('profiles')
-    .select('id, first_name, last_name, email, is_superadmin, is_in_study, is_matrix_admin, created_datetime_utc')
-    .order('created_datetime_utc', { ascending: false })
-    .limit(200);
+    .select('id, first_name, last_name, email, is_superadmin, is_in_study, is_matrix_admin, created_datetime_utc', {
+      count: 'exact',
+    })
+    .order('created_datetime_utc', { ascending: false });
+
+  if (emailQuery) {
+    query = query.ilike('email', `%${emailQuery}%`);
+  }
+
+  const { data: profiles, count } = await query.range(from, to);
+
+  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <header>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'rgb(248 250 252)' }}>
-          Users &amp; Profiles
-        </h1>
-        <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'rgb(148 163 184)' }}>
-          Read-only directory of all signed-up profiles.
-        </p>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'rgb(248 250 252)' }}>
+            Users &amp; Profiles
+          </h1>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'rgb(148 163 184)' }}>
+            {count ?? 0} total · page {page} of {totalPages || 1} · read-only directory of all signed-up profiles.
+          </p>
+        </div>
+        <form
+          method="GET"
+          style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}
+        >
+          <label style={{ color: 'rgb(148 163 184)' }}>
+            Email:
+            <input
+              type="text"
+              name="email"
+              defaultValue={emailQuery}
+              placeholder="Filter by email…"
+              className="input"
+              style={{ marginLeft: '0.4rem', maxWidth: '16rem' }}
+            />
+          </label>
+          <button type="submit" className="button-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}>
+            Search
+          </button>
+          {emailQuery && (
+            <a
+              href="/profiles"
+              className="button-secondary"
+              style={{
+                fontSize: '0.75rem',
+                padding: '0.3rem 0.75rem',
+                textDecoration: 'none',
+              }}
+            >
+              Clear
+            </a>
+          )}
+        </form>
       </header>
 
       <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -73,9 +127,51 @@ export default async function ProfilesPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
         {profiles && profiles.length > 0 && (
-          <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid rgba(30,41,59,0.85)', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
-            {profiles.length} profile{profiles.length !== 1 ? 's' : ''} shown
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.75rem 1rem',
+              borderTop: '1px solid rgba(30,41,59,0.85)',
+              fontSize: '0.75rem',
+              color: 'rgb(100 116 139)',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
+            }}
+          >
+            <span>
+              Showing {from + 1}–{Math.min(to + 1, count ?? 0)} of {count ?? 0}
+            </span>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {page > 1 && (
+                <a href={`/profiles?page=${page - 1}`} className="pagination-btn">
+                  ← Prev
+                </a>
+              )}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                .map((p, idx, arr) => (
+                  <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {idx > 0 && arr[idx - 1] !== p - 1 && (
+                      <span style={{ color: 'rgb(100 116 139)' }}>…</span>
+                    )}
+                    <a
+                      href={`/profiles?page=${p}`}
+                      className={`pagination-btn${p === page ? ' pagination-btn-active' : ''}`}
+                    >
+                      {p}
+                    </a>
+                  </span>
+                ))}
+              {page < totalPages && (
+                <a href={`/profiles?page=${page + 1}`} className="pagination-btn">
+                  Next →
+                </a>
+              )}
+            </div>
           </div>
         )}
       </div>
