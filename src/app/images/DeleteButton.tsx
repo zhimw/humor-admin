@@ -13,7 +13,7 @@ export default function DeleteButton({
       <button
         type="submit"
         onClick={(e) => {
-          if (!confirm('Delete this image? This cannot be undone.')) {
+          if (!confirm('Are you sure you want to delete this information? This cannot be undone.')) {
             e.preventDefault();
           }
         }}
