@@ -4,6 +4,7 @@ import { requireSuperadmin } from '../../lib/supabase/server';
 import { Suspense } from 'react';
 import DeleteButton from './DeleteButton';
 import SavedToast from './SavedToast';
+import { v4 as uuidv4 } from 'uuid';
 
 const PAGE_SIZE = 50;
 
@@ -32,8 +33,36 @@ async function createImage(formData: FormData) {
   'use server';
   const { supabase, user } = await requireSuperadmin();
 
+  const imageFile = formData.get('image_file') as File;
+  let imageUrl: string | null = null;
+
+  if (imageFile && imageFile.size > 0) {
+    const fileExt = imageFile.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `public/${fileName}`; // Or adjust based on your bucket structure
+
+    const { error: uploadError } = await supabase.storage
+      .from('images') // Assuming your storage bucket is named 'images'
+      .upload(filePath, imageFile, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Error uploading image:', uploadError.message);
+      // Handle error, maybe redirect with an error message
+      redirect(`/images?error=upload_failed`);
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    imageUrl = publicUrlData.publicUrl;
+  }
+
   await supabase.from('images').insert({
-    url: (formData.get('url') as string) || null,
+    url: imageUrl,
     image_description: (formData.get('image_description') as string) || null,
     additional_context: (formData.get('additional_context') as string) || null,
     is_common_use: formData.getAll('is_common_use').includes('true'),
@@ -42,6 +71,7 @@ async function createImage(formData: FormData) {
   });
 
   revalidatePath('/images');
+  redirect(`/images?created=1`);
 }
 
 async function deleteImage(formData: FormData) {
@@ -56,7 +86,7 @@ async function deleteImage(formData: FormData) {
 export default async function ImagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; edit?: string; create?: string }>;
+  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string }>;
 }) {
   const { supabase } = await requireSuperadmin();
   const params = await searchParams;
@@ -84,6 +114,8 @@ export default async function ImagesPage({
       .single();
     editImage = data;
   }
+
+  const showSavedToast = params.saved === '1' || params.created === '1';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -119,13 +151,13 @@ export default async function ImagesPage({
             <form action={createImage} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>
-                  Image URL <span style={{ color: 'rgb(248 113 113)' }}>*</span>
+                  Image File <span style={{ color: 'rgb(248 113 113)' }}>*</span>
                 </label>
                 <input
-                  name="url"
-                  type="url"
+                  name="image_file"
+                  type="file"
+                  accept="image/*"
                   required
-                  placeholder="https://..."
                   className="input"
                 />
               </div>
