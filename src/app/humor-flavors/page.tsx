@@ -45,14 +45,13 @@ export default async function HumorFlavorsPage({
           style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}
         >
           <label style={{ color: 'rgb(148 163 184)' }}>
-            Slug:
             <input
               type="text"
               name="slug"
               defaultValue={slugQuery}
               placeholder="Filter by slug…"
               className="input"
-              style={{ marginLeft: '0.4rem', maxWidth: '16rem' }}
+              style={{ maxWidth: '16rem' }}
             />
           </label>
           <button type="submit" className="button-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}>
@@ -131,7 +130,10 @@ export default async function HumorFlavorsPage({
             </span>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
               {page > 1 && (
-                <a href={`/humor-flavors?page=${page - 1}`} className="pagination-btn">
+                <a
+                  href={`/humor-flavors?page=${page - 1}${slugQuery ? `&slug=${encodeURIComponent(slugQuery)}` : ''}`}
+                  className="pagination-btn"
+                >
                   ← Prev
                 </a>
               )}
@@ -143,7 +145,7 @@ export default async function HumorFlavorsPage({
                       <span style={{ color: 'rgb(100 116 139)' }}>…</span>
                     )}
                     <a
-                      href={`/humor-flavors?page=${p}`}
+                      href={`/humor-flavors?page=${p}${slugQuery ? `&slug=${encodeURIComponent(slugQuery)}` : ''}`}
                       className={`pagination-btn${p === page ? ' pagination-btn-active' : ''}`}
                     >
                       {p}
@@ -151,7 +153,10 @@ export default async function HumorFlavorsPage({
                   </span>
                 ))}
               {page < totalPages && (
-                <a href={`/humor-flavors?page=${page + 1}`} className="pagination-btn">
+                <a
+                  href={`/humor-flavors?page=${page + 1}${slugQuery ? `&slug=${encodeURIComponent(slugQuery)}` : ''}`}
+                  className="pagination-btn"
+                >
                   Next →
                 </a>
               )}

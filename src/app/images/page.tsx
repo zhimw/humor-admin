@@ -5,8 +5,10 @@ import { Suspense } from 'react';
 import DeleteButton from './DeleteButton';
 import SavedToast from './SavedToast';
 import { v4 as uuidv4 } from 'uuid';
+import { ImageUploadForm } from './ImageUploadForm';
 
 const PAGE_SIZE = 50;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB soft limit for uploads
 
 // ─── Server actions ───────────────────────────────────────────────────────────
 
@@ -37,6 +39,12 @@ async function createImage(formData: FormData) {
   let imageUrl: string | null = null;
 
   if (imageFile && imageFile.size > 0) {
+    // Soft limit to avoid hitting the Next.js serverActions hard body size limit
+    if (imageFile.size > MAX_IMAGE_BYTES) {
+      // Redirect back to the create modal with an error flag
+      redirect('/images?create=1&error=image_too_large');
+    }
+
     const fileExt = imageFile.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `public/${fileName}`; // Or adjust based on your bucket structure
@@ -86,21 +94,48 @@ async function deleteImage(formData: FormData) {
 export default async function ImagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    edit?: string;
+    create?: string;
+    saved?: string;
+    created?: string;
+    error?: string;
+    q?: string;
+    common?: string;
+    public?: string;
+  }>;
 }) {
   const { supabase } = await requireSuperadmin();
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? '1', 10));
   const editId = params.edit ?? null;
   const showCreate = params.create === '1';
+  const searchQuery = (params.q ?? '').trim();
+  const filterCommon = params.common === '1';
+  const filterPublic = params.public === '1';
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: images, count } = await supabase
+  let query = supabase
     .from('images')
-    .select('id, url, image_description, additional_context, is_common_use, is_public, profile_id, celebrity_recognition, created_datetime_utc, modified_datetime_utc', { count: 'exact' })
-    .order('created_datetime_utc', { ascending: false })
-    .range(from, to);
+    .select(
+      'id, url, image_description, additional_context, is_common_use, is_public, profile_id, celebrity_recognition, created_datetime_utc, modified_datetime_utc',
+      { count: 'exact' },
+    )
+    .order('created_datetime_utc', { ascending: false }) as any;
+
+  if (searchQuery) {
+    query = query.ilike('image_description', `%${searchQuery}%`);
+  }
+  if (filterCommon) {
+    query = query.eq('is_common_use', true);
+  }
+  if (filterPublic) {
+    query = query.eq('is_public', true);
+  }
+
+  const { data: images, count } = await query.range(from, to);
 
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
@@ -116,6 +151,7 @@ export default async function ImagesPage({
   }
 
   const showSavedToast = params.saved === '1' || params.created === '1';
+  const errorCode = params.error;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -135,6 +171,57 @@ export default async function ImagesPage({
         </a>
       </header>
 
+      {/* Filters */}
+      <form
+        method="GET"
+        style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}
+      >
+        <input
+          type="text"
+          name="q"
+          defaultValue={searchQuery}
+          placeholder="Filter by description…"
+          className="input"
+          style={{ maxWidth: '18rem' }}
+        />
+        <label className="pill-toggle">
+          <input type="checkbox" name="common" value="1" defaultChecked={filterCommon} />
+          Common use only
+        </label>
+        <label className="pill-toggle">
+          <input type="checkbox" name="public" value="1" defaultChecked={filterPublic} />
+          Public only
+        </label>
+        <button type="submit" className="button-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}>
+          Apply
+        </button>
+        {(searchQuery || filterCommon || filterPublic) && (
+          <a
+            href="/images"
+            className="button-secondary"
+            style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', textDecoration: 'none' }}
+          >
+            Clear
+          </a>
+        )}
+      </form>
+
+      {/* Error banner */}
+      {errorCode === 'image_too_large' && (
+        <div
+          className="card"
+          style={{
+            border: '1px solid rgba(248,113,113,0.4)',
+            background: 'rgba(30,64,175,0.25)',
+            color: 'rgb(248 250 252)',
+            fontSize: '0.8rem',
+          }}
+        >
+          <strong style={{ color: 'rgb(248 113 113)' }}>Upload too large.</strong>{' '}
+          Please choose an image smaller than 10 MB.
+        </div>
+      )}
+
       {/* Create modal */}
       {showCreate && (
         <div style={{
@@ -148,51 +235,7 @@ export default async function ImagesPage({
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'rgb(248 250 252)' }}>New Image</h2>
               <a href="/images" style={{ fontSize: '0.8rem', color: 'rgb(148 163 184)' }}>✕ Cancel</a>
             </div>
-            <form action={createImage} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>
-                  Image File <span style={{ color: 'rgb(248 113 113)' }}>*</span>
-                </label>
-                <input
-                  name="image_file"
-                  type="file"
-                  accept="image/*"
-                  required
-                  className="input"
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>Image description</label>
-                <textarea name="image_description" rows={3} className="input" placeholder="Describe what's in the image…" />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>Additional context</label>
-                <textarea name="additional_context" rows={2} className="input" placeholder="Any extra context for captioning…" />
-              </div>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <label className="pill-toggle">
-                  <input type="hidden" name="is_common_use" value="false" />
-                  <input type="checkbox" name="is_common_use" value="true" />
-                  Common use pool
-                </label>
-                <label className="pill-toggle">
-                  <input type="hidden" name="is_public" value="false" />
-                  <input type="checkbox" name="is_public" value="true" />
-                  Publicly visible
-                </label>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <a
-                  href="/images"
-                  style={{ textDecoration: 'none', fontSize: '0.75rem', padding: '0.35rem 0.8rem', borderRadius: '999px', border: '1px solid rgba(148,163,184,0.6)', color: 'rgb(226 232 240)', background: 'rgba(15,23,42,0.85)', display: 'inline-flex', alignItems: 'center' }}
-                >
-                  Cancel
-                </a>
-                <button type="submit" className="button" style={{ fontSize: '0.8rem' }}>
-                  Create image
-                </button>
-              </div>
-            </form>
+            <ImageUploadForm action={createImage} />
           </div>
         </div>
       )}
@@ -330,7 +373,18 @@ export default async function ImagesPage({
           </span>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {page > 1 && (
-              <a href={`/images?page=${page - 1}`} className="pagination-btn">← Prev</a>
+              <a
+                href={`/images?page=${page - 1}${
+                  searchQuery || filterCommon || filterPublic
+                    ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                        filterCommon ? '&common=1' : ''
+                      }${filterPublic ? '&public=1' : ''}`
+                    : ''
+                }`}
+                className="pagination-btn"
+              >
+                ← Prev
+              </a>
             )}
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
@@ -338,7 +392,13 @@ export default async function ImagesPage({
                 <span key={p}>
                   {idx > 0 && arr[idx - 1] !== p - 1 && <span style={{ padding: '0 0.25rem', color: 'rgb(100 116 139)' }}>…</span>}
                   <a
-                    href={`/images?page=${p}`}
+                    href={`/images?page=${p}${
+                      searchQuery || filterCommon || filterPublic
+                        ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                            filterCommon ? '&common=1' : ''
+                          }${filterPublic ? '&public=1' : ''}`
+                        : ''
+                    }`}
                     className={`pagination-btn${p === page ? ' pagination-btn-active' : ''}`}
                   >
                     {p}
@@ -346,7 +406,18 @@ export default async function ImagesPage({
                 </span>
               ))}
             {page < totalPages && (
-              <a href={`/images?page=${page + 1}`} className="pagination-btn">Next →</a>
+              <a
+                href={`/images?page=${page + 1}${
+                  searchQuery || filterCommon || filterPublic
+                    ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                        filterCommon ? '&common=1' : ''
+                      }${filterPublic ? '&public=1' : ''}`
+                    : ''
+                }`}
+                className="pagination-btn"
+              >
+                Next →
+              </a>
             )}
           </div>
         </div>

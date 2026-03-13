@@ -55,21 +55,27 @@ async function deleteTerm(formData: FormData) {
 export default async function TermsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string }>;
+  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string; q?: string }>;
 }) {
   const { supabase } = await requireSuperadmin();
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? '1', 10));
   const editId = params.edit ?? null;
   const showCreate = params.create === '1';
+  const searchQuery = (params.q ?? '').trim();
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: terms, count } = await supabase
+  let query = supabase
     .from('terms')
     .select('id, term, definition, example, priority, created_datetime_utc, modified_datetime_utc', { count: 'exact' })
-    .order('created_datetime_utc', { ascending: false })
-    .range(from, to);
+    .order('created_datetime_utc', { ascending: false }) as any;
+
+  if (searchQuery) {
+    query = query.ilike('term', `%${searchQuery}%`);
+  }
+
+  const { data: terms, count } = await query.range(from, to);
 
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
@@ -78,7 +84,7 @@ export default async function TermsPage({
   if (editId) {
     const { data } = await supabase
       .from('terms')
-      .select('id, name, description')
+      .select('id, term, definition, example, priority')
       .eq('id', editId)
       .single();
     editTerm = data;
@@ -103,6 +109,33 @@ export default async function TermsPage({
           + New Term
         </a>
       </header>
+
+      {/* Filters */}
+      <form
+        method="GET"
+        style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}
+      >
+        <input
+          type="text"
+          name="q"
+          defaultValue={searchQuery}
+          placeholder="Filter by term…"
+          className="input"
+          style={{ maxWidth: '20rem' }}
+        />
+        <button type="submit" className="button-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}>
+          Apply
+        </button>
+        {searchQuery && (
+          <a
+            href="/terms"
+            className="button-secondary"
+            style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', textDecoration: 'none' }}
+          >
+            Clear
+          </a>
+        )}
+      </form>
 
       {/* Create modal */}
       {showCreate && (
@@ -286,7 +319,12 @@ export default async function TermsPage({
           </span>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             {page > 1 && (
-              <a href={`/terms?page=${page - 1}`} className="pagination-btn">← Prev</a>
+              <a
+                href={`/terms?page=${page - 1}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}`}
+                className="pagination-btn"
+              >
+                ← Prev
+              </a>
             )}
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
@@ -294,7 +332,7 @@ export default async function TermsPage({
                 <span key={p}>
                   {idx > 0 && arr[idx - 1] !== p - 1 && <span style={{ padding: '0 0.25rem', color: 'rgb(100 116 139)' }}>…</span>}
                   <a
-                    href={`/terms?page=${p}`}
+                    href={`/terms?page=${p}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}`}
                     className={`pagination-btn${p === page ? ' pagination-btn-active' : ''}`}
                   >
                     {p}
@@ -302,7 +340,12 @@ export default async function TermsPage({
                 </span>
               ))}
             {page < totalPages && (
-              <a href={`/terms?page=${page + 1}`} className="pagination-btn">Next →</a>
+              <a
+                href={`/terms?page=${page + 1}${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}`}
+                className="pagination-btn"
+              >
+                Next →
+              </a>
             )}
           </div>
         </div>

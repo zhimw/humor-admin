@@ -3,7 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      // Allow up to 20 MB so our own 10 MB check can run without Next.js aborting the request
+      bodySizeLimit: '100mb',
     },
   },
 };

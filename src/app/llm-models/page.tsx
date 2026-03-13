@@ -71,6 +71,11 @@ export default async function LlmModelsPage({
     .order('created_datetime_utc', { ascending: false })
     .range(from, to);
 
+  const { data: llmProviders } = await supabase
+    .from('llm_providers')
+    .select('id, name')
+    .order('name', { ascending: true });
+
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
   // Fetch edit target if needed
@@ -132,14 +137,29 @@ export default async function LlmModelsPage({
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>
-                  Provider ID
+                  Provider <span style={{ color: 'rgb(248 113 113)' }}>*</span>
                 </label>
-                <input
-                  name="llm_provider_id"
-                  type="text"
-                  placeholder="e.g., 1"
-                  className="input"
-                />
+                {(!llmProviders || llmProviders.length === 0) ? (
+                  <p style={{ fontSize: '0.75rem', color: 'rgb(248 113 113)' }}>
+                    No LLM providers found. Create one first under “LLM Providers”.
+                  </p>
+                ) : (
+                  <select
+                    name="llm_provider_id"
+                    className="input"
+                    defaultValue=""
+                    required
+                  >
+                    <option value="" disabled>
+                      Select a provider…
+                    </option>
+                    {llmProviders.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (id {p.id})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>
@@ -196,8 +216,28 @@ export default async function LlmModelsPage({
                 <input name="name" type="text" defaultValue={editLlmModel.name ?? ''} className="input" />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>Provider ID</label>
-                <input name="llm_provider_id" type="text" defaultValue={editLlmModel.llm_provider_id ?? ''} className="input" />
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>Provider</label>
+                {(!llmProviders || llmProviders.length === 0) ? (
+                  <p style={{ fontSize: '0.75rem', color: 'rgb(248 113 113)' }}>
+                    No LLM providers found. Create one first under “LLM Providers”.
+                  </p>
+                ) : (
+                  <select
+                    name="llm_provider_id"
+                    className="input"
+                    defaultValue={editLlmModel.llm_provider_id ?? ''}
+                    required
+                  >
+                    <option value="" disabled>
+                      Select a provider…
+                    </option>
+                    {llmProviders.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (id {p.id})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'rgb(148 163 184)', marginBottom: '0.3rem' }}>Provider Model ID</label>

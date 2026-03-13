@@ -57,21 +57,42 @@ async function deleteCaptionExample(formData: FormData) {
 export default async function CaptionExamplesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    edit?: string;
+    create?: string;
+    saved?: string;
+    created?: string;
+    q?: string;
+    image_id?: string;
+  }>;
 }) {
   const { supabase } = await requireSuperadmin();
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? '1', 10));
   const editId = params.edit ?? null;
   const showCreate = params.create === '1';
+  const searchQuery = (params.q ?? '').trim();
+  const imageIdQuery = (params.image_id ?? '').trim();
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data: captionExamples, count } = await supabase
+  let query = supabase
     .from('caption_examples')
-    .select('id, image_description, caption, explanation, priority, image_id, created_datetime_utc, modified_datetime_utc', { count: 'exact' })
-    .order('created_datetime_utc', { ascending: false })
-    .range(from, to);
+    .select(
+      'id, image_description, caption, explanation, priority, image_id, created_datetime_utc, modified_datetime_utc',
+      { count: 'exact' },
+    )
+    .order('created_datetime_utc', { ascending: false }) as any;
+
+  if (searchQuery) {
+    query = query.ilike('caption', `%${searchQuery}%`);
+  }
+  if (imageIdQuery) {
+    query = query.eq('image_id', imageIdQuery);
+  }
+
+  const { data: captionExamples, count } = await query.range(from, to);
 
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
@@ -105,6 +126,41 @@ export default async function CaptionExamplesPage({
           + New Caption Example
         </a>
       </header>
+
+      {/* Filters */}
+      <form
+        method="GET"
+        style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}
+      >
+        <input
+          type="text"
+          name="q"
+          defaultValue={searchQuery}
+          placeholder="Filter by caption text…"
+          className="input"
+          style={{ maxWidth: '20rem' }}
+        />
+        <input
+          type="text"
+          name="image_id"
+          defaultValue={imageIdQuery}
+          placeholder="Filter by image id…"
+          className="input"
+          style={{ maxWidth: '16rem' }}
+        />
+        <button type="submit" className="button-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}>
+          Apply
+        </button>
+        {(searchQuery || imageIdQuery) && (
+          <a
+            href="/caption-examples"
+            className="button-secondary"
+            style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', textDecoration: 'none' }}
+          >
+            Clear
+          </a>
+        )}
+      </form>
 
       {/* Create modal */}
       {showCreate && (
@@ -324,9 +380,20 @@ export default async function CaptionExamplesPage({
           <span>
             Showing {from + 1}–{Math.min(to + 1, count ?? 0)} of {count ?? 0}
           </span>
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
             {page > 1 && (
-              <a href={`/caption-examples?page=${page - 1}`} className="pagination-btn">← Prev</a>
+              <a
+                href={`/caption-examples?page=${page - 1}${
+                  searchQuery || imageIdQuery
+                    ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                        imageIdQuery ? `&image_id=${encodeURIComponent(imageIdQuery)}` : ''
+                      }`
+                    : ''
+                }`}
+                className="pagination-btn"
+              >
+                ← Prev
+              </a>
             )}
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
@@ -334,7 +401,13 @@ export default async function CaptionExamplesPage({
                 <span key={p}>
                   {idx > 0 && arr[idx - 1] !== p - 1 && <span style={{ padding: '0 0.25rem', color: 'rgb(100 116 139)' }}>…</span>}
                   <a
-                    href={`/caption-examples?page=${p}`}
+                    href={`/caption-examples?page=${p}${
+                      searchQuery || imageIdQuery
+                        ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                            imageIdQuery ? `&image_id=${encodeURIComponent(imageIdQuery)}` : ''
+                          }`
+                        : ''
+                    }`}
                     className={`pagination-btn${p === page ? ' pagination-btn-active' : ''}`}
                   >
                     {p}
@@ -342,7 +415,18 @@ export default async function CaptionExamplesPage({
                 </span>
               ))}
             {page < totalPages && (
-              <a href={`/caption-examples?page=${page + 1}`} className="pagination-btn">Next →</a>
+              <a
+                href={`/caption-examples?page=${page + 1}${
+                  searchQuery || imageIdQuery
+                    ? `${searchQuery ? `&q=${encodeURIComponent(searchQuery)}` : ''}${
+                        imageIdQuery ? `&image_id=${encodeURIComponent(imageIdQuery)}` : ''
+                      }`
+                    : ''
+                }`}
+                className="pagination-btn"
+              >
+                Next →
+              </a>
             )}
           </div>
         </div>

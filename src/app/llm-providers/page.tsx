@@ -40,7 +40,19 @@ async function createLlmProvider(formData: FormData) {
 async function deleteLlmProvider(formData: FormData) {
   'use server';
   const { supabase } = await requireSuperadmin();
-  await supabase.from('llm_providers').delete().eq('id', formData.get('id') as string);
+  const providerId = formData.get('id') as string;
+
+  const { error } = await supabase
+    .from('llm_providers')
+    .delete()
+    .eq('id', providerId);
+
+  if (error) {
+    // Most likely a foreign-key constraint because there are llm_models referencing this provider.
+    console.error('Error deleting LLM provider:', error.message);
+    redirect('/llm-providers?error=delete_has_models');
+  }
+
   revalidatePath('/llm-providers');
 }
 
@@ -49,7 +61,7 @@ async function deleteLlmProvider(formData: FormData) {
 export default async function LlmProvidersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string }>;
+  searchParams: Promise<{ page?: string; edit?: string; create?: string; saved?: string; created?: string; error?: string }>;
 }) {
   const { supabase } = await requireSuperadmin();
   const params = await searchParams;
@@ -79,6 +91,7 @@ export default async function LlmProvidersPage({
   }
 
   const showSavedToast = params.saved === '1' || params.created === '1';
+  const errorCode = params.error;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -97,6 +110,22 @@ export default async function LlmProvidersPage({
           + New LLM Provider
         </a>
       </header>
+
+      {/* Error banner for failed deletes */}
+      {errorCode === 'delete_has_models' && (
+        <div
+          className="card"
+          style={{
+            border: '1px solid rgba(248,113,113,0.4)',
+            background: 'rgba(30,64,175,0.25)',
+            color: 'rgb(248 250 252)',
+            fontSize: '0.8rem',
+          }}
+        >
+          <strong style={{ color: 'rgb(248 113 113)' }}>Cannot delete provider.</strong>{' '}
+          This provider is still referenced by one or more LLM models. Please reassign or delete those models first.
+        </div>
+      )}
 
       {/* Create modal */}
       {showCreate && (
