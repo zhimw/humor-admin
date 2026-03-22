@@ -11,7 +11,7 @@ const PAGE_SIZE = 50;
 
 async function updateTerm(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('terms')
@@ -20,6 +20,7 @@ async function updateTerm(formData: FormData) {
       definition: (formData.get('definition') as string) || null,
       example: (formData.get('example') as string) || null,
       priority: formData.get('priority') ? Number(formData.get('priority')) : 0,
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -30,13 +31,15 @@ async function updateTerm(formData: FormData) {
 
 async function createTerm(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase.from('terms').insert({
     term: (formData.get('term') as string) || null,
     definition: (formData.get('definition') as string) || null,
     example: (formData.get('example') as string) || null,
     priority: formData.get('priority') ? Number(formData.get('priority')) : 0,
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/terms');

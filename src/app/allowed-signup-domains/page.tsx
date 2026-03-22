@@ -11,12 +11,13 @@ const PAGE_SIZE = 50;
 
 async function updateAllowedSignupDomain(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('allowed_signup_domains')
     .update({
       apex_domain: (formData.get('apex_domain') as string) || null,
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -27,10 +28,12 @@ async function updateAllowedSignupDomain(formData: FormData) {
 
 async function createAllowedSignupDomain(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase.from('allowed_signup_domains').insert({
     apex_domain: (formData.get('apex_domain') as string) || null,
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/allowed-signup-domains');

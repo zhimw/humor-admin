@@ -14,7 +14,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB soft limit for uploads
 
 async function updateImage(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('images')
@@ -23,6 +23,7 @@ async function updateImage(formData: FormData) {
       additional_context: (formData.get('additional_context') as string) || null,
       is_common_use: formData.getAll('is_common_use').includes('true'),
       is_public: formData.getAll('is_public').includes('true'),
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -76,6 +77,8 @@ async function createImage(formData: FormData) {
     is_common_use: formData.getAll('is_common_use').includes('true'),
     is_public: formData.getAll('is_public').includes('true'),
     profile_id: user.id,
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/images');

@@ -11,12 +11,13 @@ const PAGE_SIZE = 50;
 
 async function updateHumorMix(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('humor_flavor_mix')
     .update({
       caption_count: Number(formData.get('caption_count') ?? 0),
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 

@@ -11,12 +11,13 @@ const PAGE_SIZE = 50;
 
 async function updateWhitelistedEmail(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('whitelist_email_addresses')
     .update({
       email_address: (formData.get('email') as string) || null,
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -27,10 +28,12 @@ async function updateWhitelistedEmail(formData: FormData) {
 
 async function createWhitelistedEmail(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase.from('whitelist_email_addresses').insert({
     email_address: (formData.get('email') as string) || null,
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/whitelisted-emails');

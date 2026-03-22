@@ -20,10 +20,10 @@ export default async function CaptionsPage({
     .select(
       `id, content, is_public, is_featured, like_count, created_datetime_utc,
        profile_id, humor_flavor_id, llm_prompt_chain_id,
-       images ( id, url, image_description ),
-       profiles ( id, email, first_name, last_name ),
-       humor_flavors ( id, slug, description ),
-       llm_prompt_chains ( id )`,
+       images!captions_image_id_fkey ( id, url, image_description ),
+       profiles!captions_profile_id_fkey ( id, email, first_name, last_name ),
+       humor_flavors!captions_humor_flavor_id_fkey ( id, slug, description ),
+       llm_prompt_chains!captions_llm_prompt_chain_id_fkey ( id )`,
       { count: 'exact' }
     )
     .order('created_datetime_utc', { ascending: false }) as any;

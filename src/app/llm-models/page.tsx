@@ -11,7 +11,7 @@ const PAGE_SIZE = 50;
 
 async function updateLlmModel(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('llm_models')
@@ -20,6 +20,7 @@ async function updateLlmModel(formData: FormData) {
       llm_provider_id: formData.get('llm_provider_id') ? Number(formData.get('llm_provider_id')) : null,
       provider_model_id: (formData.get('provider_model_id') as string) || null,
       is_temperature_supported: formData.getAll('is_temperature_supported').includes('true'),
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -30,13 +31,15 @@ async function updateLlmModel(formData: FormData) {
 
 async function createLlmModel(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase.from('llm_models').insert({
     name: (formData.get('name') as string) || null,
     llm_provider_id: formData.get('llm_provider_id') ? Number(formData.get('llm_provider_id')) : null,
     provider_model_id: (formData.get('provider_model_id') as string) || null,
     is_temperature_supported: formData.getAll('is_temperature_supported').includes('true'),
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/llm-models');

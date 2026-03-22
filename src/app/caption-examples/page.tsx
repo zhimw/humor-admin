@@ -11,7 +11,7 @@ const PAGE_SIZE = 50;
 
 async function updateCaptionExample(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase
     .from('caption_examples')
@@ -21,6 +21,7 @@ async function updateCaptionExample(formData: FormData) {
       explanation: (formData.get('explanation') as string) || null,
       priority: formData.get('priority') ? Number(formData.get('priority')) : 0,
       image_id: (formData.get('image_id') as string) || null,
+      modified_by_user_id: user.id,
     })
     .eq('id', formData.get('id') as string);
 
@@ -31,7 +32,7 @@ async function updateCaptionExample(formData: FormData) {
 
 async function createCaptionExample(formData: FormData) {
   'use server';
-  const { supabase } = await requireSuperadmin();
+  const { supabase, user } = await requireSuperadmin();
 
   await supabase.from('caption_examples').insert({
     image_description: (formData.get('image_description') as string) || null,
@@ -39,6 +40,8 @@ async function createCaptionExample(formData: FormData) {
     explanation: (formData.get('explanation') as string) || null,
     priority: formData.get('priority') ? Number(formData.get('priority')) : 0,
     image_id: (formData.get('image_id') as string) || null,
+    created_by_user_id: user.id,
+    modified_by_user_id: user.id,
   });
 
   revalidatePath('/caption-examples');
