@@ -42,20 +42,6 @@ CREATE TABLE public.caption_examples (
   CONSTRAINT caption_examples_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT caption_examples_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
 );
-CREATE TABLE public.caption_likes (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  created_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
-  modified_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
-  profile_id uuid NOT NULL,
-  caption_id uuid NOT NULL,
-  created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
-  modified_by_user_id uuid NOT NULL DEFAULT auth.uid(),
-  CONSTRAINT caption_likes_pkey PRIMARY KEY (id),
-  CONSTRAINT caption_likes_caption_id_fkey FOREIGN KEY (caption_id) REFERENCES public.captions(id),
-  CONSTRAINT caption_likes_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
-  CONSTRAINT caption_likes_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
-  CONSTRAINT caption_likes_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
-);
 CREATE TABLE public.caption_requests (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   created_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
@@ -70,7 +56,7 @@ CREATE TABLE public.caption_requests (
   CONSTRAINT caption_requests_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT caption_requests_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
 );
-CREATE TABLE public.caption_saved (
+CREATE TABLE public.caption_saves (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   created_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
   modified_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
@@ -78,7 +64,7 @@ CREATE TABLE public.caption_saved (
   caption_id uuid NOT NULL,
   created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
   modified_by_user_id uuid NOT NULL DEFAULT auth.uid(),
-  CONSTRAINT caption_saved_pkey PRIMARY KEY (id),
+  CONSTRAINT caption_saves_pkey PRIMARY KEY (id),
   CONSTRAINT caption_saved_caption_id_fkey FOREIGN KEY (caption_id) REFERENCES public.captions(id),
   CONSTRAINT caption_saved_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
   CONSTRAINT caption_saved_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
@@ -91,11 +77,9 @@ CREATE TABLE public.caption_votes (
   vote_value smallint NOT NULL,
   profile_id uuid NOT NULL,
   caption_id uuid NOT NULL,
-  user_id uuid,
-  value smallint,
-  created_at timestamp with time zone DEFAULT now(),
   created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
   modified_by_user_id uuid NOT NULL DEFAULT auth.uid(),
+  is_from_study boolean NOT NULL DEFAULT false,
   CONSTRAINT caption_votes_pkey PRIMARY KEY (id),
   CONSTRAINT caption_votes_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
   CONSTRAINT caption_votes_caption_id_fkey FOREIGN KEY (caption_id) REFERENCES public.captions(id),
@@ -104,8 +88,8 @@ CREATE TABLE public.caption_votes (
 );
 CREATE TABLE public.captions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  created_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
-  modified_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
+  created_datetime_utc timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  modified_datetime_utc timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
   content character varying,
   is_public boolean NOT NULL,
   profile_id uuid NOT NULL,
@@ -293,6 +277,7 @@ CREATE TABLE public.humor_flavors (
   created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
   modified_by_user_id uuid NOT NULL DEFAULT auth.uid(),
   modified_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
+  is_pinned boolean NOT NULL DEFAULT false,
   CONSTRAINT humor_flavors_pkey PRIMARY KEY (id),
   CONSTRAINT humor_flavors_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT humor_flavors_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
@@ -343,6 +328,13 @@ CREATE TABLE public.invitations (
   CONSTRAINT invitations_inviter_id_fkey FOREIGN KEY (inviter_id) REFERENCES public.profiles(id),
   CONSTRAINT invitations_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT invitations_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.lexicon_clusters (
+  id integer NOT NULL DEFAULT nextval('lexicon_clusters_id_seq'::regclass),
+  name text NOT NULL UNIQUE,
+  description text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT lexicon_clusters_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.link_redirects (
   id integer NOT NULL DEFAULT nextval('link_redirects_id_seq'::regclass),
@@ -542,7 +534,7 @@ CREATE TABLE public.profiles (
   first_name character varying,
   last_name character varying,
   email text,
-  is_superadmin boolean NOT NULL DEFAULT true,
+  is_superadmin boolean NOT NULL DEFAULT false,
   is_in_study boolean NOT NULL DEFAULT false,
   is_matrix_admin boolean NOT NULL DEFAULT false,
   created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
@@ -665,6 +657,24 @@ CREATE TABLE public.study_caption_mappings (
   CONSTRAINT study_caption_mappings_study_id_fkey FOREIGN KEY (study_id) REFERENCES public.studies(id),
   CONSTRAINT study_caption_mappings_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT study_caption_mappings_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.study_caption_vote_events (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  profile_id uuid NOT NULL,
+  caption_id uuid NOT NULL,
+  study_caption_mapping_id bigint,
+  vote_value USER-DEFINED NOT NULL,
+  time_to_vote_ms integer CHECK (time_to_vote_ms >= 0),
+  input_method USER-DEFINED NOT NULL,
+  client_event_id uuid NOT NULL UNIQUE,
+  session_id uuid,
+  created_datetime_utc timestamp with time zone NOT NULL DEFAULT now(),
+  created_by_user_id uuid NOT NULL DEFAULT auth.uid(),
+  CONSTRAINT study_caption_vote_events_pkey PRIMARY KEY (id),
+  CONSTRAINT study_caption_vote_events_caption_id_fkey FOREIGN KEY (caption_id) REFERENCES public.captions(id),
+  CONSTRAINT study_caption_vote_events_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
+  CONSTRAINT study_caption_vote_events_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id),
+  CONSTRAINT study_caption_vote_events_study_caption_mapping_id_fkey FOREIGN KEY (study_caption_mapping_id) REFERENCES public.study_caption_mappings(id)
 );
 CREATE TABLE public.study_image_set_image_mappings (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -792,6 +802,18 @@ CREATE TABLE public.university_majors (
   CONSTRAINT university_majors_pkey PRIMARY KEY (id),
   CONSTRAINT university_majors_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.profiles(id),
   CONSTRAINT university_majors_modified_by_user_id_fkey FOREIGN KEY (modified_by_user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.user_feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  user_id uuid,
+  page text,
+  rating integer CHECK (rating >= 1 AND rating <= 5),
+  what_worked text,
+  what_was_confusing text,
+  suggestions text,
+  CONSTRAINT user_feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT user_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.whitelist_email_addresses (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
