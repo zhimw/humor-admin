@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { VotesPerDayChart, type DayBucket, type RangeKey as RatingsRangeKey } from './VotesPerDayChart';
 import { VoteValueBreakdown } from './VoteValueBreakdown';
 
@@ -11,6 +11,10 @@ export type VoteSampleDetailedRow = {
   created_datetime_utc: string;
   is_from_study: boolean;
 };
+
+type TooltipState =
+  | { visible: false }
+  | { visible: true; x: number; y: number; title: string; lines: string[] };
 
 function rangeToDays(range: RatingsRangeKey) {
   switch (range) {
@@ -33,6 +37,14 @@ export function CaptionRatingsPanel({
   captionVotesLast24h,
   studyCaptionVoteEventsTotal,
   studyCaptionVoteEventsLast24h,
+  publicCaptions,
+  publicCaptionShare,
+  featuredCaptions,
+  featuredCaptionShare,
+  captionsCreated24h,
+  captionsCreated7d,
+  captionsCreated14d,
+  captionsCreated28d,
 
   // range-computable sources
   buckets28d,
@@ -45,16 +57,44 @@ export function CaptionRatingsPanel({
   captionVotesLast24h: number;
   studyCaptionVoteEventsTotal: number;
   studyCaptionVoteEventsLast24h: number;
+  publicCaptions: number;
+  publicCaptionShare: number | null;
+  featuredCaptions: number;
+  featuredCaptionShare: number | null;
+  captionsCreated24h: number;
+  captionsCreated7d: number;
+  captionsCreated14d: number;
+  captionsCreated28d: number;
   buckets28d: DayBucket[];
   voteSample28dDetailed: VoteSampleDetailedRow[];
   defaultRange?: RatingsRangeKey;
 }) {
   const [range, setRange] = useState<RatingsRangeKey>(defaultRange);
+  const [tooltip, setTooltip] = useState<TooltipState>({ visible: false });
+
+  const rangeDays = useMemo(() => rangeToDays(range), [range]);
+
+  const captionsCreatedInRange = useMemo(() => {
+    switch (range) {
+      case '24h':
+        return captionsCreated24h;
+      case '7d':
+        return captionsCreated7d;
+      case '14d':
+        return captionsCreated14d;
+      case '28d':
+        return captionsCreated28d;
+    }
+  }, [captionsCreated14d, captionsCreated24h, captionsCreated28d, captionsCreated7d, range]);
+
+  const captionsPerDayInRange = useMemo(() => {
+    if (!rangeDays) return null;
+    return captionsCreatedInRange / rangeDays;
+  }, [captionsCreatedInRange, rangeDays]);
 
   const sinceIso = useMemo(() => {
-    const days = rangeToDays(range);
-    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  }, [range]);
+    return new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+  }, [range, rangeDays]);
 
   const voteSampleInRange = useMemo(() => {
     return voteSample28dDetailed.filter((r) => r.created_datetime_utc >= sinceIso);
@@ -94,6 +134,42 @@ export function CaptionRatingsPanel({
     return voteSample28dDetailed.map((r) => ({ vote_value: r.vote_value, created_datetime_utc: r.created_datetime_utc }));
   }, [voteSample28dDetailed]);
 
+  const tooltipBox = tooltip.visible ? (
+    <div
+      style={{
+        position: 'fixed',
+        left: tooltip.x + 12,
+        top: tooltip.y + 12,
+        background: 'rgba(2,6,23,0.92)',
+        border: '1px solid rgba(30,41,59,0.9)',
+        borderRadius: 10,
+        padding: '0.5rem 0.6rem',
+        zIndex: 9999,
+        pointerEvents: 'none',
+        width: 260,
+        boxShadow: '0 12px 28px rgba(0,0,0,0.45)',
+      }}
+    >
+      <div style={{ fontSize: '0.75rem', color: 'rgb(226 232 240)', fontWeight: 600, marginBottom: '0.25rem' }}>
+        {tooltip.title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+        {tooltip.lines.map((line, idx) => (
+          <div key={idx} style={{ fontSize: '0.72rem', color: 'rgb(148 163 184)' }}>
+            {line}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const tooltipHandlers = (title: string, lines: string[]) => ({
+    onMouseEnter: (e: React.MouseEvent) => setTooltip({ visible: true, x: e.clientX, y: e.clientY, title, lines }),
+    onMouseMove: (e: React.MouseEvent) =>
+      setTooltip((t) => (t.visible ? { ...t, x: e.clientX, y: e.clientY } : t)),
+    onMouseLeave: () => setTooltip({ visible: false }),
+  });
+
   return (
     <div className="card" style={{ gridColumn: '1 / -1' }}>
       <div className="section-header">
@@ -118,15 +194,88 @@ export function CaptionRatingsPanel({
       </div>
 
       <div style={{ display: 'grid', gap: '0.75rem' }}>
+        {tooltipBox}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Public captions', [
+              'Count of captions with captions.is_public = TRUE.',
+              publicCaptionShare == null ? 'Share: —' : `Share: ${Math.round(publicCaptionShare * 100)}% of all captions.`,
+            ])}
+          >
+            <div className="stat-label">Public captions</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{publicCaptions.toLocaleString()}</div>
+            <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
+              {publicCaptionShare == null ? '—' : `${Math.round(publicCaptionShare * 100)}%`} of all captions
+            </p>
+          </div>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Featured captions', [
+              'Count of captions with captions.is_featured = TRUE.',
+              featuredCaptionShare == null ? 'Share: —' : `Share: ${Math.round(featuredCaptionShare * 100)}% of all captions.`,
+            ])}
+          >
+            <div className="stat-label">Featured captions</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{featuredCaptions.toLocaleString()}</div>
+            <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
+              {featuredCaptionShare == null ? '—' : `${Math.round(featuredCaptionShare * 100)}%`} of all captions
+            </p>
+          </div>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('New captions', [
+              'Captions created within the selected range.',
+              `Range: ${range} (${rangeDays} day${rangeDays === 1 ? '' : 's'})`,
+            ])}
+          >
+            <div className="stat-label">New captions</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{captionsCreatedInRange.toLocaleString()}</div>
+            <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>Created in selected range</p>
+          </div>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('New captions / day', [
+              'Average new captions per day in the selected range.',
+              captionsPerDayInRange == null ? 'Value: —' : `Value: ${captionsPerDayInRange.toFixed(1)} per day`,
+            ])}
+          >
+            <div className="stat-label">New captions / day</div>
+            <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+              {captionsPerDayInRange == null ? '—' : captionsPerDayInRange.toFixed(1)}
+            </div>
+            <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>Average in selected range</p>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' }}>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Total caption votes', [
+              'All-time count of rows in caption_votes.',
+              `Study: ${captionVotesFromStudy.toLocaleString()}`,
+              `Non-study: ${captionVotesNonStudy.toLocaleString()}`,
+            ])}
+          >
             <div className="stat-label">Total caption votes</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{captionVotesTotal.toLocaleString()}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
               Study: {captionVotesFromStudy.toLocaleString()} · Non-study: {captionVotesNonStudy.toLocaleString()}
             </p>
           </div>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Study vote events', [
+              'All-time count of study_caption_vote_events.',
+              `Last 24h: ${studyCaptionVoteEventsLast24h.toLocaleString()}`,
+            ])}
+          >
             <div className="stat-label">Study vote events</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{studyCaptionVoteEventsTotal.toLocaleString()}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
@@ -136,24 +285,53 @@ export function CaptionRatingsPanel({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '0.75rem' }}>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Unique raters', [
+              'Distinct profile_id values in the vote sample, filtered to the selected range.',
+              'Sample-based (last 28d, capped on the server).',
+            ])}
+          >
             <div className="stat-label">Unique raters</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{uniqueRaters.toLocaleString()}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>In selected range (sample-based)</p>
           </div>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Unique captions rated', [
+              'Distinct caption_id values in the vote sample, filtered to the selected range.',
+              'Sample-based (last 28d, capped on the server).',
+            ])}
+          >
             <div className="stat-label">Unique captions rated</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{uniqueCaptionsRated.toLocaleString()}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>In selected range (sample-based)</p>
           </div>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Votes', [
+              'Vote rows in the sample within the selected range.',
+              `Study: ${studyVotesInRange.toLocaleString()} · Non-study: ${nonStudyVotesInRange.toLocaleString()}`,
+            ])}
+          >
             <div className="stat-label">Votes</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{votesInRange.toLocaleString()}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>
               Study {studyVotesInRange.toLocaleString()} · Non-study {nonStudyVotesInRange.toLocaleString()}
             </p>
           </div>
-          <div className="card-muted" style={{ padding: '0.75rem' }}>
+          <div
+            className="card-muted"
+            style={{ padding: '0.75rem' }}
+            {...tooltipHandlers('Study share', [
+              'Share of votes in the selected range where caption_votes.is_from_study = TRUE.',
+              peakDay ? `Peak day: ${peakDay.day} (${peakDay.count.toLocaleString()})` : 'Peak day: —',
+              modeVoteValue == null ? 'Mode vote value: —' : `Mode vote value: ${modeVoteValue}`,
+            ])}
+          >
             <div className="stat-label">Study share</div>
             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{studyShare == null ? '—' : `${Math.round(studyShare * 100)}%`}</div>
             <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>

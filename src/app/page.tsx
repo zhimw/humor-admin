@@ -120,6 +120,7 @@ function buildDayBuckets(days: number): DayBucket[] {
 async function getDashboardStats(supabase: Awaited<ReturnType<typeof requireSuperadmin>>['supabase']) {
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const since14d = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const since28d = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString();
   const captionSince24h = since24h;
   const captionSince7d = since7d;
@@ -139,6 +140,8 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof requireSupe
     featuredCaptions,
     captionsLast24h,
     captionsLast7d,
+    captionsLast14d,
+    captionsLast28d,
     reportedImages,
     reportedCaptions,
     reportedImagesLatest,
@@ -171,6 +174,8 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof requireSupe
       supabase.from('captions').select('id', { count: 'exact', head: true }).eq('is_featured', true),
       supabase.from('captions').select('id', { count: 'exact', head: true }).gte('created_datetime_utc', captionSince24h),
       supabase.from('captions').select('id', { count: 'exact', head: true }).gte('created_datetime_utc', captionSince7d),
+      supabase.from('captions').select('id', { count: 'exact', head: true }).gte('created_datetime_utc', since14d),
+      supabase.from('captions').select('id', { count: 'exact', head: true }).gte('created_datetime_utc', since28d),
       supabase.from('reported_images').select('id', { count: 'exact', head: true }),
       supabase.from('reported_captions').select('id', { count: 'exact', head: true }),
       supabase
@@ -474,6 +479,8 @@ async function getDashboardStats(supabase: Awaited<ReturnType<typeof requireSupe
     featuredCaptions: featuredCaptions.count ?? 0,
     captionsLast24h: captionsLast24h.count ?? 0,
     captionsLast7d: captionsLast7d.count ?? 0,
+    captionsLast14d: captionsLast14d.count ?? 0,
+    captionsLast28d: captionsLast28d.count ?? 0,
     reportedImages: reportedImages.count ?? 0,
     reportedCaptions: reportedCaptions.count ?? 0,
     reportedImagesDetail,
@@ -590,30 +597,18 @@ async function DashboardView({
           captionVotesLast24h={stats.captionVotesLast24h}
           studyCaptionVoteEventsTotal={stats.studyCaptionVoteEventsTotal}
           studyCaptionVoteEventsLast24h={stats.studyCaptionVoteEventsLast24h}
+          publicCaptions={stats.publicCaptions}
+          publicCaptionShare={stats.publicCaptionShare}
+          featuredCaptions={stats.featuredCaptions}
+          featuredCaptionShare={stats.featuredCaptionShare}
+          captionsCreated24h={stats.captionsLast24h}
+          captionsCreated7d={stats.captionsLast7d}
+          captionsCreated14d={stats.captionsLast14d}
+          captionsCreated28d={stats.captionsLast28d}
           buckets28d={stats.votesPerDay28d}
           voteSample28dDetailed={stats.voteSample28dDetailed}
           defaultRange="7d"
         />
-
-        <div className="card" style={{ gridColumn: 'span 2' }}>
-          <div className="section-header">
-            <h2 className="section-title">Caption stats</h2>
-          </div>
-          <div className="stat-grid" style={{ marginBottom: '1rem' }}>
-            {[
-              { label: 'Public captions', value: stats.publicCaptions, note: `captions.is_public = TRUE${stats.publicCaptionShare == null ? '' : ` (${Math.round(stats.publicCaptionShare * 100)}%)`}` },
-              { label: 'Featured captions', value: stats.featuredCaptions, note: `captions.is_featured = TRUE${stats.featuredCaptionShare == null ? '' : ` (${Math.round(stats.featuredCaptionShare * 100)}%)`}` },
-              { label: 'New captions (24h)', value: stats.captionsLast24h, note: 'created in last 24h' },
-              { label: 'New captions (7d)', value: stats.captionsLast7d, note: 'created in last 7d' },
-            ].map((s) => (
-              <div key={s.label} className="card">
-                <div className="stat-label">{s.label}</div>
-                <div className="stat-value">{s.value.toLocaleString()}</div>
-                <p style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'rgb(100 116 139)' }}>{s.note}</p>
-              </div>
-            ))}
-          </div>
-        </div>
 
         <TopLikedCaptions
           allTime={stats.topCaptionsAllTime}
