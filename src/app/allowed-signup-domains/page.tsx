@@ -186,7 +186,7 @@ export default async function AllowedSignupDomainsPage({
             <tbody>
               {!allowedSignupDomains || allowedSignupDomains.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No allowed signup domains found.</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No allowed signup domains found.</td>
                 </tr>
               ) : allowedSignupDomains.map((domain: any) => (
                 <tr key={domain.id}>

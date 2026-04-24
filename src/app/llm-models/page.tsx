@@ -70,7 +70,7 @@ export default async function LlmModelsPage({
 
   const { data: llmModels, count } = await supabase
     .from('llm_models')
-    .select('id, name, llm_provider_id, provider_model_id, is_temperature_supported, created_datetime_utc', { count: 'exact' })
+    .select('id, name, llm_provider_id, provider_model_id, is_temperature_supported, created_datetime_utc, modified_datetime_utc', { count: 'exact' })
     .order('created_datetime_utc', { ascending: false })
     .range(from, to);
 
@@ -285,7 +285,7 @@ export default async function LlmModelsPage({
             <tbody>
               {!llmModels || llmModels.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No LLM models found.</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No LLM models found.</td>
                 </tr>
               ) : llmModels.map((model: any) => (
                 <tr key={model.id}>
@@ -313,6 +313,11 @@ export default async function LlmModelsPage({
                   <td style={{ fontSize: '0.72rem', color: 'rgb(100 116 139)', whiteSpace: 'nowrap' }}>
                     {model.created_datetime_utc
                       ? new Date(model.created_datetime_utc).toLocaleDateString()
+                      : '—'}
+                  </td>
+                  <td style={{ fontSize: '0.72rem', color: 'rgb(100 116 139)', whiteSpace: 'nowrap' }}>
+                    {model.modified_datetime_utc
+                      ? new Date(model.modified_datetime_utc).toLocaleDateString()
                       : '—'}
                   </td>
                   <td>

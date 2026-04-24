@@ -215,7 +215,7 @@ export default async function LlmProvidersPage({
             <tbody>
               {!llmProviders || llmProviders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No LLM providers found.</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No LLM providers found.</td>
                 </tr>
               ) : llmProviders.map((provider: any) => (
                 <tr key={provider.id}>

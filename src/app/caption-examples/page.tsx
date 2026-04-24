@@ -323,7 +323,7 @@ export default async function CaptionExamplesPage({
             <tbody>
               {!captionExamples || captionExamples.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No caption examples found.</td>
+                  <td colSpan={9} style={{ textAlign: 'center', color: 'rgb(100 116 139)', padding: '2rem' }}>No caption examples found.</td>
                 </tr>
               ) : captionExamples.map((example: any) => (
                 <tr key={example.id}>
@@ -343,13 +343,13 @@ export default async function CaptionExamplesPage({
                       {example.explanation || <span style={{ color: 'rgb(100 116 139)' }}>—</span>}
                     </div>
                   </td>
+                  <td style={{ fontSize: '0.72rem', color: 'rgb(148 163 184)', whiteSpace: 'nowrap' }}>
+                    {example.priority ?? 0}
+                  </td>
                   <td style={{ maxWidth: '10rem' }}>
                     <div style={{ fontSize: '0.75rem', color: 'rgb(148 163 184)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {example.image_id || <span style={{ color: 'rgb(100 116 139)' }}>—</span>}
                     </div>
-                  </td>
-                  <td style={{ fontSize: '0.72rem', color: 'rgb(148 163 184)', whiteSpace: 'nowrap' }}>
-                    {example.priority ?? 0}
                   </td>
                   <td style={{ fontSize: '0.72rem', color: 'rgb(100 116 139)', whiteSpace: 'nowrap' }}>
                     {example.created_datetime_utc
